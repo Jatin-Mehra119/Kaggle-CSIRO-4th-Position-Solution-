@@ -1,0 +1,9 @@
+numpy
+pandas
+torch
+torchvision
+albumentations
+timm
+opencv-python
+tqdm
+scikit-learn
