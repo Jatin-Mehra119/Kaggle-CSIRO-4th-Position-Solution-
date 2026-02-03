@@ -53,6 +53,11 @@ This repository contains our **Gold Medal winning solution** for the CSIRO Pastu
 - opencv-python
 - tqdm
 
+### Model Weights
+
+- Main model: https://huggingface.co/jatinmehra/CSIRO-DinoV3-HugePlus-LB76
+- Aux model: https://huggingface.co/jatinmehra/CSIRO-AUX_MODEL
+
 ---
 
 ## 📁 Project Structure
