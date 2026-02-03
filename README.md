@@ -3,6 +3,8 @@
 [![Kaggle](https://img.shields.io/badge/Kaggle-4th%20Place%20🥇-gold)](https://www.kaggle.com/competitions/csiro-biomass/writeups/vit-huge-dinov3-and-multi-modal-feature-fusion)
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-MainModel-FFD21E)](https://huggingface.co/jatinmehra/CSIRO-DinoV3-HugePlus-LB76)
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-AuxModel-FFD21E)](https://huggingface.co/jatinmehra/CSIRO-AUX_MODEL)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 > **ViT-Huge DINOv3 & Multi-Modal Feature Fusion with Auxiliary Prediction**
