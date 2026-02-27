@@ -249,8 +249,8 @@ async def predict(file: UploadFile = File(...)):
     try:
         image_bytes = await file.read()
         tensor = preprocess_image(image_bytes)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Image processing failed: {exc}")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Image processing failed. Please upload a valid image.")
 
     models = _get_models()
 
