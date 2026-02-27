@@ -4,7 +4,7 @@ torch
 torchvision
 albumentations
 timm
-opencv-python
+opencv-python-headless
 tqdm
 scikit-learn
 fastapi[standard]

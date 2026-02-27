@@ -1,156 +1,122 @@
-# 🏆 Kaggle CSIRO Pasture Biomass Prediction - 4th Place Solution
+# 🏆 Kaggle CSIRO Pasture Biomass Prediction — 4th Place Solution
 
-[![Kaggle](https://img.shields.io/badge/Kaggle-4th%20Place%20🥇-gold)](https://www.kaggle.com/competitions/csiro-biomass/writeups/vit-huge-dinov3-and-multi-modal-feature-fusion)
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
-[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-MainModel-FFD21E)](https://huggingface.co/jatinmehra/CSIRO-DinoV3-HugePlus-LB76)
-[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-AuxModel-FFD21E)](https://huggingface.co/jatinmehra/CSIRO-AUX_MODEL)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+**ViT-Huge DINOv3 & Multi-Modal Feature Fusion with Auxiliary Prediction**
 
-> **ViT-Huge DINOv3 & Multi-Modal Feature Fusion with Auxiliary Prediction**
+[![Kaggle](https://img.shields.io/badge/Kaggle-4th%20Place%20🥇-gold?style=for-the-badge&logo=kaggle)](https://www.kaggle.com/competitions/csiro-biomass/writeups/vit-huge-dinov3-and-multi-modal-feature-fusion)
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![License](https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge)](LICENSE)
 
-First, a huge thank you to the organizers for hosting this challenge and to my fellow competitors. Sharath and I are thrilled to achieve the **4th position (Gold Medal 🥇)**. Our solution relies on a heavy Vision Transformer backbone initialized with DINOv3 weights, a multi-modal fusion strategy combining images with tabular data, and a critical data cleaning pipeline.
+[![Hugging Face — Main Model](https://img.shields.io/badge/%F0%9F%A4%97%20Main%20Model-CSIRO--DinoV3--HugePlus--LB76-FFD21E?style=flat-square)](https://huggingface.co/jatinmehra/CSIRO-DinoV3-HugePlus-LB76)
+[![Hugging Face — Aux Model](https://img.shields.io/badge/%F0%9F%A4%97%20Aux%20Model-CSIRO--AUX__MODEL-FFD21E?style=flat-square)](https://huggingface.co/jatinmehra/CSIRO-AUX_MODEL)
+[![Live API](https://img.shields.io/badge/🚀%20Live%20API-Prediction%20Endpoint-009688?style=flat-square)](https://jatinmehra-biomass-prediction.hf.space/docs)
 
 ---
 
-## 📑 Table of Contents
+First, a huge thank you to the organizers for hosting this challenge and to my fellow competitors. Sharath and I are thrilled to achieve the **4th position (Gold Medal 🥇)**. Our solution relies on a heavy Vision Transformer backbone initialized with DINOv3 weights, a multi-modal fusion strategy combining images with tabular data, and a critical data cleaning pipeline.
 
-- [Overview](#overview)
-- [Key Results](#-key-results)
-- [Project Structure](#-project-structure)
-- [Solution Details](#solution-details)
-  - [Data Preprocessing](#1-data-preprocessing-the-cardboard-cleanup)
-  - [Main Model Architecture](#2-main-model-architecture)
-  - [Auxiliary Task Training](#3-the-secret-sauce-auxiliary-task-training)
-  - [What Didn't Work](#4-what-didnt-work-the-graveyard)
-  - [Training Configuration](#5-training-configuration)
-- [Usage](#-usage)
-- [Acknowledgments](#-acknowledgments)
+[Overview](#overview) · [Key Results](#-key-results) · [Solution Details](#-solution-details) · [API Deployment](#-api-deployment) · [Usage](#-usage) · [Acknowledgments](#-acknowledgments)
+
+</div>
 
 ---
 
 ## Overview
 
-This repository contains our **Gold Medal winning solution** for the CSIRO Pasture Biomass Prediction competition on Kaggle. The task was to predict biomass measurements from pasture images combined with tabular sensor data.
+This repository contains our **Gold Medal winning solution** for the [CSIRO Pasture Biomass Prediction](https://www.kaggle.com/competitions/csiro-biomass) competition on Kaggle. The task was to predict biomass measurements from pasture images combined with tabular sensor data.
 
-### 🎯 Key Results
+Our approach combines:
 
-| Stage | Public LB | Private LB |
-|-------|-----------|------------|
-| Baseline | 0.74 | 0.64 |
-| + Data Cleaning | 0.75 | 0.65 |
-| + Auxiliary Training | **0.76** | **0.66** |
+- **ViT-Huge+** backbone with self-supervised DINOv3 pre-training
+- **Multi-modal fusion** of visual and tabular features (NDVI, Height)
+- **Auxiliary task training** to learn richer representations
+- **Data cleaning** to remove cardboard artifacts from images
 
 ---
 
-### Requirements
+## 🎯 Key Results
 
-- Python 3.10+
-- PyTorch 2.8.0+cu126
-- timm 1.0.22
-- albumentations
-- scikit-learn
-- pandas
-- numpy
-- opencv-python
-- tqdm
-
-### Model Weights
-
-- Main model: https://huggingface.co/jatinmehra/CSIRO-DinoV3-HugePlus-LB76
-- Aux model: https://huggingface.co/jatinmehra/CSIRO-AUX_MODEL
+| Stage | Public LB | Private LB | Δ |
+|:------|:---------:|:----------:|:-:|
+| Baseline | 0.74 | 0.64 | — |
+| + Data Cleaning | 0.75 | 0.65 | +0.01 |
+| + Auxiliary Training | **0.76** | **0.66** | +0.01 |
 
 ---
 
 ## 📁 Project Structure
 
 ```
+.
 ├── train/
-│   ├── main_model.py      # Stage 1: Main biomass regression model
-│   └── aux_model.py       # Stage 2: Auxiliary feature prediction
-├── prediction-with-aux.ipynb  # Inference notebook
-├── README.md
-└── requirements.txt
+│   ├── main_model.py          # Stage 1: Main biomass regression model
+│   └── aux_model.py           # Stage 2: Auxiliary feature prediction
+├── prediction-with-aux.ipynb  # Inference notebook (Kaggle-ready)
+├── requirements.txt
+├── LICENSE
+└── README.md
 ```
 
 ---
 
-## Solution Details
+## 🔬 Solution Details
 
-### 1. Data Preprocessing: The "Cardboard" Cleanup
+### 1. Data Preprocessing — The "Cardboard" Cleanup
 
-Before touching the model architecture, we realized a significant portion of the image data contained irrelevant noise—specifically, the cardboard backing used in the data collection process.
+Before touching the model architecture, we identified that a significant portion of the image data contained irrelevant noise—specifically, the cardboard backing used in the data collection process.
 
-- **Manual Cropping:** My teammate and I manually reviewed the dataset and cropped out the cardboard edges from the pasture images. This ensured the model focused purely on the biomass (grass/clover) rather than learning artifacts from the background.
-
-- **Impact:** This step was crucial. It provided a clear boost of **+0.01** on both leaderboards:
-  - Public LB: 0.74 → **0.75**
-  - Private LB: 0.64 → **0.65**
+- **Manual Cropping:** We manually reviewed the dataset and cropped out the cardboard edges from the pasture images, ensuring the model focused purely on biomass content.
+- **Impact:** This step alone provided a consistent **+0.01** improvement on both leaderboards.
 
 ---
-        
 
 ### 2. Main Model Architecture
 
-Our main approach was a **Multi-Modal Regression Network**. We treated the problem as a fusion of visual data (pasture images) and physical measurements (Height/NDVI).
-
-#### Architecture Diagram
+Our primary approach is a **Multi-Modal Regression Network** that fuses visual features (pasture images) with physical measurements (Height / NDVI).
 
 <p align="center">
   <img src="assets/architecture-main.png" alt="Main Model Architecture" width="800"/>
 </p>
 
-#### Key Components
-
 | Component | Description |
-|-----------|-------------|
-| **Backbone** | `vit_huge_plus_patch16_dinov3.lvd1689m` - Self-supervised DINOv3 weights with first 50% layers frozen |
-| **Fusion Strategy** | `Pre_GSHH_NDVI` and `Height_Ave_cm` encoded via 2-layer MLP, concatenated with ViT global avg pooling features |
-| **Loss Function** | `WeightedSmoothL1Loss` with weights `[0.1, 0.1, 0.1, 0.2, 0.5]` prioritizing Total and GDM targets |
+|:----------|:------------|
+| **Backbone** | `vit_huge_plus_patch16_dinov3.lvd1689m` — Self-supervised DINOv3 weights, first 50% of layers frozen |
+| **Fusion** | `Pre_GSHH_NDVI` and `Height_Ave_cm` encoded via a 2-layer MLP, concatenated with ViT global average pooling features |
+| **Loss** | `WeightedSmoothL1Loss` with weights `[0.1, 0.1, 0.1, 0.2, 0.5]`, prioritizing Total and GDM targets |
 
 ---
-    
 
-### 3. The "Secret Sauce": Auxiliary Task Training
+### 3. The "Secret Sauce" — Auxiliary Task Training
 
-A major boost came from a secondary training stage where we repurposed the trained backbone to predict the *tabular features* from the images.
-
-#### Auxiliary Pipeline Diagram
+A major boost came from a secondary training stage where we repurposed the trained backbone to predict the *tabular features* from images alone.
 
 <p align="center">
   <img src="assets/architecture-aux.png" alt="Auxiliary Model Architecture" width="800"/>
 </p>
 
-- **Logic:** By forcing the model to predict `NDVI` and `Height` solely from the RGB image, the backbone learned robust features correlated with plant health and density that the primary regression heads might have missed.
-
-- **Initialization:** This model was initialized with the **best weights from Fold 0** of the main training loop, essentially acting as a domain-specific fine-tuner.
-
-- **Impact:** This auxiliary training provided the final push for the Gold Medal, adding another **+0.01** to both scores:
-  - Final Public LB: **0.76**
-  - Final Private LB: **0.66**
+| Aspect | Detail |
+|:-------|:-------|
+| **Logic** | Forcing the model to predict `NDVI` and `Height` solely from RGB images teaches the backbone features correlated with plant health and density |
+| **Initialization** | Weights from the **best Fold 0 checkpoint** of the main model |
+| **Impact** | Final push to Gold — **+0.01** on both Public and Private LB |
 
 ---
-        
 
-### 4. What Didn't Work (The Graveyard)
+### 4. What Didn't Work
 
-Despite the success, many ideas were left on the cutting room floor.
-
-| Approach | Result |
-|----------|--------|
-| Pure MSE, Quantile Loss, Log Loss | Failed to beat SmoothL1 |
+| Approach | Outcome |
+|:---------|:--------|
+| Pure MSE / Quantile / Log Loss | Failed to beat SmoothL1 |
 | Direct R² optimization | Underperformed |
 | Log transformation of targets | Reduced performance |
 | Scaled Sigmoid outputs | Reduced performance |
-| Image size > 800×800 | Diminishing returns + OOM errors |
+| Image size > 800×800 | Diminishing returns + OOM |
 | Dual-image input | No improvement |
 
-#### The "Promising but Failed" Architecture: Hybrid Texture Pooling
-
-We experimented with a custom pooling layer designed to reconstruct spatial grids from ViT tokens and pool across the height dimension (simulating a scan). While the validation loss looked very promising, it did not generalize as well to the private leaderboard.
-
 <details>
-<summary>Click to expand code</summary>
+<summary><b>Hybrid Texture Pooling — Promising but Failed</b></summary>
+
+We experimented with a custom pooling layer designed to reconstruct spatial grids from ViT tokens and pool across the height dimension. While validation loss looked promising, it did not generalize to the private leaderboard.
 
 ```python
 class HybridTexturePooling(nn.Module):
@@ -158,30 +124,17 @@ class HybridTexturePooling(nn.Module):
         super().__init__()
         self.ps = patch_size
         self.num_extra_tokens = num_extra_tokens
-        # Projection layer: maps ViT embedding to pixel-space (ps**2) * 2
         self.projection = nn.Linear(embed_dim, (patch_size ** 2) * 2)
 
     def forward(self, x, h, w):
-        # x: [BS, N_tokens, Dim]
-        # 1. Slice off CLS + Register tokens
-        patch_tokens = x[:, self.num_extra_tokens:, :] 
-        
-        # 2. Project to pixel-like space
-        x = self.projection(patch_tokens) 
-        
+        patch_tokens = x[:, self.num_extra_tokens:, :]
+        x = self.projection(patch_tokens)
         bs = x.shape[0]
         h_patches, w_patches = h // self.ps, w // self.ps
-        
-        # 3. Reconstruct Spatial Grid
-        # Reshape to (BS, H_p, W_p, PS, PS, 2)
         x = x.view(bs, h_patches, w_patches, self.ps, self.ps, 2)
-        # Permute to (BS, H_p, PS, W_p, PS, 2)
         x = x.permute(0, 1, 3, 2, 4, 5).contiguous()
-        # Flatten to (BS, H, W * 2)
         x = x.view(bs, h, w * 2)
-        
-        # 4. Mean across the Height dimension
-        x = x.mean(dim=1)  # Result: [BS, 1600] for 800px input
+        x = x.mean(dim=1)  # [BS, 1600] for 800px input
         return x
 ```
 
@@ -191,135 +144,250 @@ class HybridTexturePooling(nn.Module):
 
 ### 5. Training Configuration
 
-We utilized a two-stage training pipeline. Below are the specific hyperparameters used for each stage.
-
-#### Stage 1: Main Biomass Regression
+#### Stage 1 — Main Biomass Regression
 
 | Parameter | Value |
-|-----------|-------|
+|:----------|:------|
 | Model | `vit_huge_plus_patch16_dinov3.lvd1689m` |
 | Frozen Layers | First 50% |
 | Image Size | 800 × 800 |
 | Batch Size | 10 |
 | Optimizer | AdamW |
 | Learning Rate | 5e-5 |
-| Scheduler | CosineAnnealingWarmRestarts (T_0=10, T_mult=2, eta_min=1e-6) |
-| Loss Function | WeightedSmoothL1Loss [0.1, 0.1, 0.1, 0.2, 0.5] |
+| Scheduler | CosineAnnealingWarmRestarts (`T_0=10`, `T_mult=2`, `eta_min=1e-6`) |
+| Loss | WeightedSmoothL1Loss `[0.1, 0.1, 0.1, 0.2, 0.5]` |
 | Validation | 5-Fold CV (Seed 42) |
 
-#### Stage 2: Auxiliary Feature Pre-training
+#### Stage 2 — Auxiliary Feature Prediction
 
 | Parameter | Value |
-|-----------|-------|
+|:----------|:------|
 | Objective | Predict NDVI & Height from images |
-| Initialization | Best weights from Stage 1 (Fold 0) |
+| Initialization | Best weights from Stage 1, Fold 0 |
 | Batch Size | 8 |
 | Optimizer | AdamW |
 | Learning Rate | 5e-5 |
-| Scheduler | ReduceLROnPlateau (factor=0.5, patience=4) |
-| Loss Function | MSELoss |
+| Scheduler | ReduceLROnPlateau (`factor=0.5`, `patience=4`) |
+| Loss | MSELoss |
 | Validation | 5-Fold CV (Seed 44) |
 
-> **Note:** All regression targets and auxiliary features (tabular inputs) were normalized using `StandardScaler` prior to training to ensure stable convergence.
+> **Note:** All regression targets and auxiliary features were normalized using `StandardScaler` prior to training to ensure stable convergence.
+
+---
+
+## 🚀 API Deployment
+
+The trained model is deployed as a **production-ready REST API** on Hugging Face Spaces, providing real-time biomass predictions.
+
+### Live Endpoint
+
+| | |
+|:--|:--|
+| **Base URL** | [`https://jatinmehra-biomass-prediction.hf.space`](https://jatinmehra-biomass-prediction.hf.space) |
+| **Interactive Docs** | [`/docs`](https://jatinmehra-biomass-prediction.hf.space/docs) (Swagger UI) |
+| **OpenAPI Spec** | [`/openapi.json`](https://jatinmehra-biomass-prediction.hf.space/openapi.json) |
+
+### API Reference
+
+#### `POST /predict`
+
+Submit a pasture image along with tabular sensor data to receive biomass predictions.
+
+**Request** — `multipart/form-data`
+
+| Field | Type | Required | Description |
+|:------|:-----|:--------:|:------------|
+| `file` | `file` | ✅ | Pasture image (JPEG/PNG) |
+| `ndvi` | `float` | ✅ | Pre-GSHH NDVI reading |
+| `height` | `float` | ✅ | Average canopy height (cm) |
+
+**Example — cURL**
+
+```bash
+curl -X POST "https://jatinmehra-biomass-prediction.hf.space/predict" \
+  -F "file=@pasture_sample.jpg" \
+  -F "ndvi=0.65" \
+  -F "height=12.3"
+```
+
+**Example — Python**
+
+```python
+import requests
+
+url = "https://jatinmehra-biomass-prediction.hf.space/predict"
+
+with open("pasture_sample.jpg", "rb") as img:
+    response = requests.post(
+        url,
+        files={"file": ("pasture_sample.jpg", img, "image/jpeg")},
+        data={"ndvi": 0.65, "height": 12.3},
+    )
+
+predictions = response.json()
+print(predictions)
+```
+
+**Response** — `application/json`
+
+```json
+{
+  "predictions": {
+    "Clover": 12.34,
+    "Grass": 45.67,
+    "Weeds": 3.21,
+    "Total": 61.22,
+    "GDM": 58.01
+  }
+}
+```
+
+### Deployment Architecture
+
+```
+                        ┌──────────────────────────────┐
+                        │      Hugging Face Spaces      │
+                        │   (Docker / Gradio Backend)   │
+                        │                              │
+  HTTP Request ────────▶│  ┌────────────────────────┐  │
+  (Image + Tabular)     │  │   FastAPI / Gradio API  │  │
+                        │  └──────────┬─────────────┘  │
+                        │             │                │
+                        │  ┌──────────▼─────────────┐  │
+                        │  │   Preprocessing Layer   │  │
+                        │  │  • Image resize (800²)  │  │
+                        │  │  • StandardScaler       │  │
+                        │  └──────────┬─────────────┘  │
+                        │             │                │
+                        │  ┌──────────▼─────────────┐  │
+                        │  │   Stage 1: Aux Model    │  │
+                        │  │  Predict NDVI & Height  │  │
+                        │  │  (enriched features)    │  │
+                        │  └──────────┬─────────────┘  │
+                        │             │                │
+                        │  ┌──────────▼─────────────┐  │
+                        │  │   Stage 2: Main Model   │  │
+                        │  │  ViT-Huge+ DINOv3       │  │
+                        │  │  + Multi-Modal Fusion   │  │
+                        │  └──────────┬─────────────┘  │
+                        │             │                │
+  JSON Response ◀───────│  ┌──────────▼─────────────┐  │
+  (Biomass Predictions) │  │   Post-processing &     │  │
+                        │  │   Inverse Transform     │  │
+                        │  └────────────────────────┘  │
+                        └──────────────────────────────┘
+```
+
+### Model Artifacts
+
+Both model checkpoints are hosted on Hugging Face Hub and are automatically downloaded at API startup:
+
+| Model | Hub Repository | Size |
+|:------|:--------------|:-----|
+| Main Model | [`jatinmehra/CSIRO-DinoV3-HugePlus-LB76`](https://huggingface.co/jatinmehra/CSIRO-DinoV3-HugePlus-LB76) | ~2.5 GB |
+| Aux Model | [`jatinmehra/CSIRO-AUX_MODEL`](https://huggingface.co/jatinmehra/CSIRO-AUX_MODEL) | ~2.5 GB |
 
 ---
 
 ## 💻 Usage
 
-### Training Stage 1: Main Model
+### Prerequisites
 
 ```bash
-cd train
-python main_model.py
+pip install -r requirements.txt
 ```
 
-### Training Stage 2: Auxiliary Model
+### Requirements
+
+| Package | Version |
+|:--------|:--------|
+| Python | ≥ 3.10 |
+| PyTorch | ≥ 2.8.0+cu126 |
+| timm | ≥ 1.0.22 |
+| albumentations | latest |
+| scikit-learn | latest |
+| pandas | latest |
+| numpy | latest |
+| opencv-python | latest |
+| tqdm | latest |
+
+### Training
 
 ```bash
+# Stage 1: Train the main biomass regression model (5-fold CV)
 cd train
+python main_model.py
+
+# Stage 2: Train the auxiliary feature prediction model
 python aux_model.py
 ```
 
 ### Inference
 
-See the `prediction-with-aux.ipynb` notebook for inference pipeline.
+Refer to the [`prediction-with-aux.ipynb`](prediction-with-aux.ipynb) notebook for the full inference pipeline, including the multi-GPU strategy used on Kaggle.
 
-#### Multi-GPU Inference Strategy
+<details>
+<summary><b>Multi-GPU Inference Strategy</b></summary>
 
-To optimize inference time on Kaggle's dual-GPU environment, we implemented a **parallel multi-GPU inference pipeline** using subprocess spawning:
+To optimize inference time on Kaggle's dual-GPU environment, we implemented a **parallel inference pipeline** using subprocess spawning:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Main Process                                │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │  1. Spawn worker processes for each GPU                 │    │
-│  │  2. Split test data indices across workers              │    │
-│  │  3. Wait for all workers to complete                    │    │
-│  │  4. Merge partial results into final submission         │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-              │                              │
-              ▼                              ▼
-┌─────────────────────────┐    ┌─────────────────────────┐
-│   Worker 0 (GPU 0)      │    │   Worker 1 (GPU 1)      │
-│  ┌───────────────────┐  │    │  ┌───────────────────┐  │
-│  │ Process 1st half  │  │    │  │ Process 2nd half  │  │
-│  │ of test images    │  │    │  │ of test images    │  │
-│  └───────────────────┘  │    │  └───────────────────┘  │
-│           │             │    │           │             │
-│           ▼             │    │           ▼             │
-│  ┌───────────────────┐  │    │  ┌───────────────────┐  │
-│  │ Stage 1: Aux Model│  │    │  │ Stage 1: Aux Model│  │
-│  │ (Predict NDVI &   │  │    │  │ (Predict NDVI &   │  │
-│  │  Height features) │  │    │  │  Height features) │  │
-│  └───────────────────┘  │    │  └───────────────────┘  │
-│           │             │    │           │             │
-│           ▼             │    │           ▼             │
-│  ┌───────────────────┐  │    │  ┌───────────────────┐  │
-│  │ Stage 2: Main     │  │    │  │ Stage 2: Main     │  │
-│  │ Biomass Model     │  │    │  │ Biomass Model     │  │
-│  │ (with TTA)        │  │    │  │ (with TTA)        │  │
-│  └───────────────────┘  │    │  └───────────────────┘  │
-│           │             │    │           │             │
-│           ▼             │    │           ▼             │
-│   temp_part_0.csv       │    │   temp_part_1.csv       │
-└─────────────────────────┘    └─────────────────────────┘
-              │                              │
-              └──────────────┬───────────────┘
-                             ▼
-                   ┌───────────────────┐
-                   │  Merge & Dedupe   │
-                   │  submission.csv   │
-                   └───────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                       Main Process                            │
+│   1. Spawn worker processes for each GPU                      │
+│   2. Split test data indices across workers                   │
+│   3. Wait for all workers to complete                         │
+│   4. Merge partial results into final submission              │
+└───────────────────┬───────────────────────┬───────────────────┘
+                    │                       │
+                    ▼                       ▼
+        ┌───────────────────┐   ┌───────────────────┐
+        │  Worker 0 (GPU 0) │   │  Worker 1 (GPU 1) │
+        │  1st half of data │   │  2nd half of data  │
+        │                   │   │                    │
+        │  Aux → Main → TTA │   │  Aux → Main → TTA │
+        │         │         │   │         │          │
+        │   temp_part_0.csv │   │   temp_part_1.csv  │
+        └─────────┬─────────┘   └─────────┬──────────┘
+                  │                       │
+                  └───────────┬───────────┘
+                              ▼
+                    ┌───────────────────┐
+                    │  Merge & Dedupe   │
+                    │  submission.csv   │
+                    └───────────────────┘
 ```
-
-**Key Implementation Details:**
 
 | Component | Description |
-|-----------|-------------|
-| **Data Splitting** | `np.array_split(np.arange(len(test_df)), world_size)` divides samples evenly |
-| **Process Spawning** | `subprocess.Popen` launches independent Python processes per GPU |
-| **Device Assignment** | Each worker uses `torch.device(f'cuda:{rank}')` for its dedicated GPU |
-| **Result Aggregation** | Partial CSVs merged with `pd.concat()` and deduplicated |
+|:----------|:------------|
+| **Data Splitting** | `np.array_split(np.arange(len(test_df)), world_size)` |
+| **Process Spawning** | `subprocess.Popen` per GPU |
+| **Device Assignment** | `torch.device(f'cuda:{rank}')` |
+| **Result Aggregation** | `pd.concat()` with deduplication |
 
-**Performance Benefit:** This approach effectively **halves the inference time** by running both GPUs in parallel, which is critical given the heavy ViT-Huge backbone and TTA augmentations.
+This approach effectively **halves inference time**, which is critical given the heavy ViT-Huge backbone combined with TTA augmentations.
+
+</details>
 
 ---
 
 ## 🙏 Acknowledgments
 
-- Thanks to **CSIRO** and **Kaggle** for hosting this amazing competition
-- Special thanks to my teammate **Sharath** for the collaboration
-- The amazing **timm** library and **DINOv3** pretrained weights
+- **[CSIRO](https://www.csiro.au/)** and **[Kaggle](https://www.kaggle.com/)** for hosting this competition
+- My teammate **Sharath** for an outstanding collaboration
+- The **[timm](https://github.com/huggingface/pytorch-image-models)** library and **DINOv3** pretrained weights
+- **[Hugging Face](https://huggingface.co/)** for model hosting and API deployment infrastructure
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
 ---
 
-<p align="center">
-  <b>If you find this solution helpful, please consider giving it a ⭐!</b>
-</p>
+<div align="center">
+
+**If you find this solution helpful, please consider giving it a ⭐!**
+
+</div>
