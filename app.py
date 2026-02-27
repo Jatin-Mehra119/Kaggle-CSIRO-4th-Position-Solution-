@@ -5,8 +5,7 @@ Two-stage inference pipeline (CPU-based):
   Stage 1: Auxiliary model predicts NDVI & Height from the uploaded image.
   Stage 2: Main model uses image + predicted tabular features to predict biomass.
 
-Model weights are expected as checkpoint files. Placeholders are left for the
-actual weight paths; set them via environment variables or edit the defaults below.
+Model weights are automatically downloaded from Hugging Face Hub on first run.
 """
 
 import io
@@ -24,6 +23,7 @@ from albumentations.pytorch import ToTensorV2
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from huggingface_hub import hf_hub_download
 
 warnings.filterwarnings("ignore")
 
@@ -37,17 +37,47 @@ TARGETS = ["Dry_Green_g", "Dry_Dead_g", "Dry_Clover_g", "GDM_g", "Dry_Total_g"]
 DEVICE = torch.device("cpu")
 
 # ---------------------------------------------------------------------------
-# Weight placeholders – set via env-vars or replace the defaults.
-# Each variable should point to a .pth checkpoint file saved during training.
+# Hugging Face Hub repositories for model weights
 # ---------------------------------------------------------------------------
-AUX_WEIGHTS_PATH = os.getenv(
-    "AUX_WEIGHTS_PATH",
-    "weights/best_aux_only_seed44_fold0.pth",  # placeholder
-)
-MAIN_WEIGHTS_PATH = os.getenv(
-    "MAIN_WEIGHTS_PATH",
-    "weights/best_model_seed42_fold0.pth",  # placeholder
-)
+HF_AUX_REPO = "jatinmehra/CSIRO-AUX_MODEL"
+HF_MAIN_REPO = "jatinmehra/CSIRO-DinoV3-HugePlus-LB76"
+
+AUX_FOLDS = 5   # folds 0..4
+MAIN_FOLDS = 5   # folds 0..4
+
+
+def _download_weights(repo_id: str, filename: str, subfolder: str | None = None) -> str:
+    """Download a single weight file from HF Hub (cached after first download)."""
+    return hf_hub_download(
+        repo_id=repo_id,
+        filename=filename,
+        subfolder=subfolder,
+    )
+
+
+def _download_aux_weights() -> list[str]:
+    """Download all AUX fold weights and return their local paths."""
+    paths = []
+    for fold in range(AUX_FOLDS):
+        path = _download_weights(
+            HF_AUX_REPO,
+            f"best_aux_only_seed44_fold{fold}.pth",
+            subfolder="Models_Aux_Only_v7",
+        )
+        paths.append(path)
+    return paths
+
+
+def _download_main_weights() -> list[str]:
+    """Download all Main fold weights and return their local paths."""
+    paths = []
+    for fold in range(MAIN_FOLDS):
+        path = _download_weights(
+            HF_MAIN_REPO,
+            f"best_model_seed42_fold{fold}.pth",
+        )
+        paths.append(path)
+    return paths
 
 
 # ============================================================================
@@ -184,6 +214,18 @@ def _load_main_model(path: str) -> tuple:
     return model, tabular_scaler, target_scaler
 
 
+def _load_all_aux_models() -> list[tuple]:
+    """Download & load all AUX fold models. Returns list of (model, tab_scaler)."""
+    paths = _download_aux_weights()
+    return [_load_aux_model(p) for p in paths]
+
+
+def _load_all_main_models() -> list[tuple]:
+    """Download & load all Main fold models. Returns list of (model, tab_scaler, tgt_scaler)."""
+    paths = _download_main_weights()
+    return [_load_main_model(p) for p in paths]
+
+
 # ============================================================================
 # FASTAPI APPLICATION
 # ============================================================================
@@ -204,19 +246,18 @@ app.add_middleware(
 
 # ---------------------------------------------------------------------------
 # Lazy-load models on first request so startup is fast even without weights.
+# Weights are downloaded from Hugging Face Hub and cached locally.
 # ---------------------------------------------------------------------------
 _models: dict = {}
 
 
 def _get_models() -> dict:
     if not _models:
-        aux_model, tab_scaler = _load_aux_model(AUX_WEIGHTS_PATH)
-        main_model, tabular_scaler, target_scaler = _load_main_model(MAIN_WEIGHTS_PATH)
-        _models["aux"] = aux_model
-        _models["tab_scaler"] = tab_scaler
-        _models["main"] = main_model
-        _models["tabular_scaler"] = tabular_scaler
-        _models["target_scaler"] = target_scaler
+        print("Downloading & loading AUX fold models from HF Hub...")
+        _models["aux_folds"] = _load_all_aux_models()   # list[(model, tab_scaler)]
+        print("Downloading & loading Main fold models from HF Hub...")
+        _models["main_folds"] = _load_all_main_models()  # list[(model, tab_scaler, tgt_scaler)]
+        print("All models loaded.")
     return _models
 
 
@@ -255,21 +296,32 @@ async def predict(file: UploadFile = File(...)):
     models = _get_models()
 
     with torch.no_grad():
-        # Stage 1 – auxiliary prediction
-        aux_pred = models["aux"](tensor).numpy()
-        if models["tab_scaler"] is not None:
-            aux_pred = models["tab_scaler"].inverse_transform(aux_pred)
+        # ---------------------------------------------------------------
+        # Stage 1 – Ensemble auxiliary prediction (average across folds)
+        # ---------------------------------------------------------------
+        aux_preds = []
+        for aux_model, tab_scaler in models["aux_folds"]:
+            pred = aux_model(tensor).numpy()
+            if tab_scaler is not None:
+                pred = tab_scaler.inverse_transform(pred)
+            aux_preds.append(pred)
+        aux_pred = np.mean(aux_preds, axis=0)  # averaged NDVI & Height
 
-        # Prepare tabular input for main model
-        tab_input = aux_pred.copy()
-        if models["tabular_scaler"] is not None:
-            tab_input = models["tabular_scaler"].transform(tab_input)
-        tab_tensor = torch.tensor(tab_input, dtype=torch.float32)
+        # ---------------------------------------------------------------
+        # Stage 2 – Ensemble biomass prediction (average across folds)
+        # ---------------------------------------------------------------
+        main_preds = []
+        for main_model, tabular_scaler, target_scaler in models["main_folds"]:
+            tab_input = aux_pred.copy()
+            if tabular_scaler is not None:
+                tab_input = tabular_scaler.transform(tab_input)
+            tab_tensor = torch.tensor(tab_input, dtype=torch.float32)
 
-        # Stage 2 – biomass prediction
-        raw_pred = models["main"](tensor, tab_tensor).numpy()
-        if models["target_scaler"] is not None:
-            raw_pred = models["target_scaler"].inverse_transform(raw_pred)
+            raw = main_model(tensor, tab_tensor).numpy()
+            if target_scaler is not None:
+                raw = target_scaler.inverse_transform(raw)
+            main_preds.append(raw)
+        raw_pred = np.mean(main_preds, axis=0)  # averaged biomass
 
     predictions = {
         name: max(0.0, float(raw_pred[0, i])) for i, name in enumerate(TARGETS)
