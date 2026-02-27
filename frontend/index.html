@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSIRO Biomass Prediction</title>
+  <style>
+    :root {
+      --primary: #2e7d32;
+      --primary-light: #4caf50;
+      --bg: #f5f5f5;
+      --card: #ffffff;
+      --text: #212121;
+      --muted: #757575;
+      --border: #e0e0e0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    h1 {
+      color: var(--primary);
+      margin-bottom: 0.25rem;
+      font-size: 1.8rem;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin-bottom: 2rem;
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 600px;
+      margin-bottom: 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      color: var(--primary);
+    }
+
+    /* Upload area */
+    .upload-area {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+    }
+
+    .upload-area:hover, .upload-area.dragover {
+      border-color: var(--primary-light);
+      background: #e8f5e9;
+    }
+
+    .upload-area input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .upload-area p { color: var(--muted); }
+
+    #preview-container {
+      margin-top: 1rem;
+      text-align: center;
+      display: none;
+    }
+
+    #preview-container img {
+      max-width: 100%;
+      max-height: 300px;
+      border-radius: 8px;
+    }
+
+    #file-name {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+    }
+
+    .btn {
+      display: inline-block;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 0.7rem 1.5rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 1rem;
+      transition: background 0.2s;
+      width: 100%;
+    }
+
+    .btn:hover { background: var(--primary-light); }
+    .btn:disabled { background: #bdbdbd; cursor: not-allowed; }
+
+    /* Results */
+    .result-table { width: 100%; border-collapse: collapse; }
+    .result-table th, .result-table td {
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .result-table th { color: var(--muted); font-weight: 600; font-size: 0.85rem; }
+    .result-table td { font-variant-numeric: tabular-nums; }
+
+    /* History */
+    .history-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.9rem;
+    }
+    .history-item .hi-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.4rem;
+    }
+    .history-item .hi-header span:first-child { font-weight: 600; }
+    .history-item .hi-header span:last-child { color: var(--muted); font-size: 0.8rem; }
+    .history-item .hi-preds { display: grid; grid-template-columns: 1fr 1fr; gap: 0.2rem 1rem; }
+    .history-item .hi-preds span { font-size: 0.85rem; }
+
+    .empty-state { text-align: center; color: var(--muted); padding: 1rem 0; }
+
+    #error-msg {
+      color: #c62828;
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2px solid #fff;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.4rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .clear-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      float: right;
+    }
+    .clear-btn:hover { background: var(--bg); }
+
+    /* API URL config */
+    .api-config {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .api-config input {
+      flex: 1;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>🌿 CSIRO Biomass Prediction</h1>
+  <p class="subtitle">Upload a plant image to predict biomass targets</p>
+
+  <!-- Upload Card -->
+  <div class="card">
+    <h2>Upload Image</h2>
+    <div class="api-config">
+      <input type="text" id="api-url" placeholder="Backend URL" value="http://localhost:8000" />
+    </div>
+    <div class="upload-area" id="upload-area">
+      <p>📷 Drag &amp; drop an image here or click to browse</p>
+      <input type="file" id="file-input" accept="image/*" />
+    </div>
+    <div id="preview-container">
+      <img id="preview-img" alt="Preview" />
+      <p id="file-name"></p>
+    </div>
+    <button class="btn" id="predict-btn" disabled>Predict</button>
+    <p id="error-msg"></p>
+  </div>
+
+  <!-- Current Result -->
+  <div class="card" id="result-card" style="display:none;">
+    <h2>Prediction Result</h2>
+    <table class="result-table">
+      <thead>
+        <tr><th>Target</th><th>Value (g)</th></tr>
+      </thead>
+      <tbody id="result-body"></tbody>
+    </table>
+  </div>
+
+  <!-- History -->
+  <div class="card">
+    <h2>
+      Prediction History
+      <button class="clear-btn" id="clear-history-btn">Clear</button>
+    </h2>
+    <div id="history-container">
+      <p class="empty-state">No predictions yet.</p>
+    </div>
+  </div>
+
+  <script>
+    // ---- State ----
+    const HISTORY_KEY = "csiro_prediction_history";
+    const MAX_HISTORY = 5;
+    let selectedFile = null;
+
+    // ---- DOM refs ----
+    const fileInput = document.getElementById("file-input");
+    const uploadArea = document.getElementById("upload-area");
+    const previewContainer = document.getElementById("preview-container");
+    const previewImg = document.getElementById("preview-img");
+    const fileNameEl = document.getElementById("file-name");
+    const predictBtn = document.getElementById("predict-btn");
+    const errorMsg = document.getElementById("error-msg");
+    const resultCard = document.getElementById("result-card");
+    const resultBody = document.getElementById("result-body");
+    const historyContainer = document.getElementById("history-container");
+    const clearHistoryBtn = document.getElementById("clear-history-btn");
+    const apiUrlInput = document.getElementById("api-url");
+
+    // ---- File selection ----
+    fileInput.addEventListener("change", (e) => handleFile(e.target.files[0]));
+
+    uploadArea.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      uploadArea.classList.add("dragover");
+    });
+    uploadArea.addEventListener("dragleave", () => uploadArea.classList.remove("dragover"));
+    uploadArea.addEventListener("drop", (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove("dragover");
+      if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+
+    function handleFile(file) {
+      if (!file || !file.type.startsWith("image/")) return;
+      selectedFile = file;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        previewImg.src = ev.target.result;
+        previewContainer.style.display = "block";
+        fileNameEl.textContent = file.name;
+      };
+      reader.readAsDataURL(file);
+      predictBtn.disabled = false;
+      errorMsg.style.display = "none";
+    }
+
+    // ---- Predict ----
+    predictBtn.addEventListener("click", async () => {
+      if (!selectedFile) return;
+      const baseUrl = apiUrlInput.value.replace(/\/+$/, "");
+      predictBtn.disabled = true;
+      predictBtn.innerHTML = '<span class="spinner"></span>Predicting…';
+      errorMsg.style.display = "none";
+      resultCard.style.display = "none";
+
+      try {
+        const form = new FormData();
+        form.append("file", selectedFile);
+        const res = await fetch(`${baseUrl}/predict`, { method: "POST", body: form });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || `Server error ${res.status}`);
+        }
+        const data = await res.json();
+        showResult(data);
+        saveToHistory(data);
+        renderHistory();
+      } catch (err) {
+        errorMsg.textContent = err.message;
+        errorMsg.style.display = "block";
+      } finally {
+        predictBtn.disabled = false;
+        predictBtn.textContent = "Predict";
+      }
+    });
+
+    function showResult(data) {
+      resultBody.innerHTML = "";
+      for (const [name, value] of Object.entries(data.predictions)) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${name}</td><td>${value.toFixed(4)}</td>`;
+        resultBody.appendChild(tr);
+      }
+      resultCard.style.display = "block";
+    }
+
+    // ---- History (localStorage) ----
+    function getHistory() {
+      try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+      catch { return []; }
+    }
+
+    function saveToHistory(data) {
+      const history = getHistory();
+      history.unshift({
+        filename: data.filename,
+        predictions: data.predictions,
+        timestamp: data.timestamp || new Date().toISOString(),
+      });
+      // Keep only last 5
+      while (history.length > MAX_HISTORY) history.pop();
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    }
+
+    function renderHistory() {
+      const history = getHistory();
+      if (history.length === 0) {
+        historyContainer.innerHTML = '<p class="empty-state">No predictions yet.</p>';
+        return;
+      }
+      historyContainer.innerHTML = "";
+      history.forEach((item) => {
+        const div = document.createElement("div");
+        div.className = "history-item";
+        const ts = new Date(item.timestamp).toLocaleString();
+        let predsHtml = "";
+        for (const [k, v] of Object.entries(item.predictions)) {
+          predsHtml += `<span><b>${k}:</b> ${v.toFixed(4)}</span>`;
+        }
+        div.innerHTML = `
+          <div class="hi-header"><span>${item.filename}</span><span>${ts}</span></div>
+          <div class="hi-preds">${predsHtml}</div>`;
+        historyContainer.appendChild(div);
+      });
+    }
+
+    clearHistoryBtn.addEventListener("click", () => {
+      localStorage.removeItem(HISTORY_KEY);
+      renderHistory();
+    });
+
+    // Initial render
+    renderHistory();
+  </script>
+</body>
+</html>
