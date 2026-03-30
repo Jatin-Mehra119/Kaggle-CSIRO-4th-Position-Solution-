@@ -21,6 +21,7 @@ app = FastAPI(
     title="CSIRO Biomass Prediction API",
     description="Upload a plant image to predict biomass targets.",
     version="1.1.0",
+    docs_url="/"
 )
 
 app.add_middleware(
