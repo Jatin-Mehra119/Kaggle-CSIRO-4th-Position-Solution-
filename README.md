@@ -32,6 +32,7 @@ Our approach combines:
 - **Multi-modal fusion** of visual and tabular features (NDVI, Height)
 - **Auxiliary task training** to learn richer representations
 - **Data cleaning** to remove cardboard artifacts from images
+- **ONNX Runtime** deployment for accelerated, production-ready inference
 
 ---
 
