@@ -50,8 +50,9 @@ async def predict(file: UploadFile = File(...)):
 
     models = get_models()
 
-    # Move image tensor to the inference device & dtype
-    tensor = tensor.to(device=DEVICE, dtype=DTYPE)
+    # Convert model types if necessary - for ONNX we typically use float16 if it's a float16 model, or float32.
+    # Let's keep it fp32 for numpy arrays typically used in ONNX inference, unless the model is strictly fp16.
+    input_array = tensor.cpu().numpy().astype(np.float32)
 
     with torch.no_grad():
         # ---------------------------------------------------------------
@@ -59,8 +60,11 @@ async def predict(file: UploadFile = File(...)):
         # ---------------------------------------------------------------
         aux_preds = []
         for aux_model, tab_scaler in models["aux_folds"]:
-            pred = aux_model(tensor).float().cpu().numpy()
+            # Run inference with ONNX
+            input_name = aux_model.get_inputs()[0].name
+            pred = aux_model.run(None, {input_name: input_array})[0]
             if tab_scaler is not None:
+                # Assuming tab_scaler is a scikit-learn standard scaler loaded via torch.load
                 pred = tab_scaler.inverse_transform(pred)
             aux_preds.append(pred)
         aux_pred = np.mean(aux_preds, axis=0)  # averaged NDVI & Height
@@ -73,9 +77,13 @@ async def predict(file: UploadFile = File(...)):
             tab_input = aux_pred.copy()
             if tabular_scaler is not None:
                 tab_input = tabular_scaler.transform(tab_input)
-            tab_tensor = torch.tensor(tab_input, dtype=DTYPE, device=DEVICE)
+            
+            tab_array = tab_input.astype(np.float32)
 
-            raw = main_model(tensor, tab_tensor).float().cpu().numpy()
+            img_input_name = main_model.get_inputs()[0].name
+            tab_input_name = main_model.get_inputs()[1].name
+            
+            raw = main_model.run(None, {img_input_name: input_array, tab_input_name: tab_array})[0]
             if target_scaler is not None:
                 raw = target_scaler.inverse_transform(raw)
             main_preds.append(raw)

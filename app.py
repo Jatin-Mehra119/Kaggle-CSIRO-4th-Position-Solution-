@@ -20,7 +20,7 @@ warnings.filterwarnings("ignore")
 app = FastAPI(
     title="CSIRO Biomass Prediction API",
     description="Upload a plant image to predict biomass targets.",
-    version="1.0.0",
+    version="1.1.0",
 )
 
 app.add_middleware(

@@ -1,94 +1,65 @@
 """
-Model weight download (from Hugging Face Hub) and checkpoint loading utilities.
+Model weight loading utilities using ONNX and local PyTorch scalers.
 """
 
 import os
-
 import torch
-from huggingface_hub import hf_hub_download
+import onnxruntime as ort
 
 from core.config import (
-    AUX_FOLDS,
-    DEVICE,
-    DTYPE,
-    HF_AUX_REPO,
-    HF_MAIN_REPO,
-    MAIN_FOLDS,
-    MODEL_NAME,
+    AUX_ONNX_PATH,
+    MAIN_ONNX_PATH,
+    AUX_SCALER_PATH,
+    TARGET_SCALER_PATH,
 )
-from core.models import AuxModel, BiomassModel
 
-
-# ---------------------------------------------------------------------------
-# Download helpers
-# ---------------------------------------------------------------------------
-
-def _download_weights(repo_id: str, filename: str, subfolder: str | None = None) -> str:
-    """Download a single weight file from HF Hub (cached after first download)."""
-    return hf_hub_download(
-        repo_id=repo_id,
-        filename=filename,
-        subfolder=subfolder,
-    )
-
-
-def _download_aux_weights() -> list[str]:
-    """Download all AUX fold weights and return their local paths."""
-    paths = []
-    for fold in range(AUX_FOLDS):
-        path = _download_weights(
-            HF_AUX_REPO,
-            f"best_aux_only_seed44_fold{fold}.pth",
-            subfolder="Models_Aux_Only_v7",
-        )
-        paths.append(path)
-    return paths
-
-
-def _download_main_weights() -> list[str]:
-    """Download all Main fold weights and return their local paths."""
-    paths = []
-    for fold in range(MAIN_FOLDS):
-        path = _download_weights(
-            HF_MAIN_REPO,
-            f"best_model_seed42_fold{fold}.pth",
-        )
-        paths.append(path)
-    return paths
-
+from huggingface_hub import download_bucket_files
 
 # ---------------------------------------------------------------------------
 # Checkpoint loading
 # ---------------------------------------------------------------------------
 
-def _load_aux_model(path: str) -> tuple:
-    """Return (AuxModel, tab_scaler | None)."""
-    model = AuxModel(MODEL_NAME)
+def _sync_hf_weights():
+    """Sync weights from the Hugging Face bucket."""
+    print("Syncing model weights from Hugging Face bucket...")
+    try:
+        download_bucket_files(
+            "jatinmehra/ONNX-CSIRO-Weights",
+            files=[
+                ("aux_onnx/aux_model.onnx", AUX_ONNX_PATH),
+                ("main_onnx/main_model.onnx", MAIN_ONNX_PATH),
+                ("scalers/aux_scaler.pth", AUX_SCALER_PATH),
+                ("scalers/target_scaler.pth", TARGET_SCALER_PATH),
+            ],
+        )
+    except Exception as e:
+        print(f"Warning: Failed to sync weights from HF bucket: {e}")
+
+def _load_aux_model() -> tuple:
+    """Return (ONNX InferenceSession, tab_scaler | None)."""
+    providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if torch.cuda.is_available() else ['CPUExecutionProvider']
+    session = ort.InferenceSession(AUX_ONNX_PATH, providers=providers)
+    
     tab_scaler = None
-    if os.path.isfile(path):
-        ckpt = torch.load(path, map_location="cpu", weights_only=False)
-        state = ckpt.get("model_state_dict", ckpt)
-        model.load_state_dict(state)
-        tab_scaler = ckpt.get("tab_scaler")
-    model.to(device=DEVICE, dtype=DTYPE)
-    model.eval()
-    return model, tab_scaler
+    if os.path.isfile(AUX_SCALER_PATH):
+        tab_scaler = torch.load(AUX_SCALER_PATH, map_location="cpu", weights_only=False)
+        
+    return session, tab_scaler
 
 
-def _load_main_model(path: str) -> tuple:
-    """Return (BiomassModel, tabular_scaler | None, target_scaler | None)."""
-    model = BiomassModel(MODEL_NAME)
+def _load_main_model() -> tuple:
+    """Return (ONNX InferenceSession, tabular_scaler | None, target_scaler | None)."""
+    providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if torch.cuda.is_available() else ['CPUExecutionProvider']
+    session = ort.InferenceSession(MAIN_ONNX_PATH, providers=providers)
+    
+    # Note: In the original implementation, the main model might have had a separate tabular_scaler
+    # Here we assume no separate tabular_scaler is passed or it uses aux_scaler if needed. We return None for tabular_scaler.
     tabular_scaler = None
     target_scaler = None
-    if os.path.isfile(path):
-        ckpt = torch.load(path, map_location="cpu", weights_only=False)
-        state = ckpt.get("model_state_dict", ckpt)
-        model.load_state_dict(state)
-        tabular_scaler = ckpt.get("tabular_scaler")
-        target_scaler = ckpt.get("target_scaler")
-    model.to(device=DEVICE, dtype=DTYPE)
-    model.eval()
-    return model, tabular_scaler, target_scaler
+    if os.path.isfile(TARGET_SCALER_PATH):
+        target_scaler = torch.load(TARGET_SCALER_PATH, map_location="cpu", weights_only=False)
+        
+    return session, tabular_scaler, target_scaler
 
 
 # ---------------------------------------------------------------------------
@@ -100,16 +71,19 @@ _models: dict = {}
 
 def get_models() -> dict:
     """
-    Download (once) and return all fold models.
+    Load and return models.
 
     Returns a dict with keys:
-      - ``aux_folds``  : list[(AuxModel, tab_scaler)]
-      - ``main_folds`` : list[(BiomassModel, tabular_scaler, target_scaler)]
+      - ``aux_folds``  : list[(InferenceSession, tab_scaler)]
+      - ``main_folds`` : list[(InferenceSession, tabular_scaler, target_scaler)]
     """
     if not _models:
-        print("Downloading & loading AUX fold models from HF Hub...")
-        _models["aux_folds"] = [_load_aux_model(p) for p in _download_aux_weights()]
-        print("Downloading & loading Main fold models from HF Hub...")
-        _models["main_folds"] = [_load_main_model(p) for p in _download_main_weights()]
-        print(f"All models loaded on {DEVICE} with dtype {DTYPE}.")
+        # Step 1: Ensure weights are available & synced
+        _sync_hf_weights()
+
+        print("Loading AUX ONNX model and scaler...")
+        _models["aux_folds"] = [_load_aux_model()]
+        print("Loading Main ONNX model and scaler...")
+        _models["main_folds"] = [_load_main_model()]
+        print(f"All models loaded successfully.")
     return _models

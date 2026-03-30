@@ -26,10 +26,10 @@ DEVICE: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cp
 DTYPE: torch.dtype = torch.float16 if DEVICE.type == "cuda" else torch.float32
 
 # ---------------------------------------------------------------------------
-# Hugging Face Hub repositories for model weights
+# Local paths for ONNX models and scalers
 # ---------------------------------------------------------------------------
-HF_AUX_REPO: str = "jatinmehra/CSIRO-AUX_MODEL"
-HF_MAIN_REPO: str = "jatinmehra/CSIRO-DinoV3-HugePlus-LB76"
 
-AUX_FOLDS: int = 1   # folds 0..4 (We will use only fold 0)
-MAIN_FOLDS: int = 1   # folds 0..4
+AUX_ONNX_PATH: str = "weights/aux_onnx/aux_model.onnx"
+MAIN_ONNX_PATH: str = "weights/main_onnx/main_model.onnx"
+AUX_SCALER_PATH: str = "weights/scalers/aux_scaler.pth"
+TARGET_SCALER_PATH: str = "weights/scalers/target_scaler.pth"
