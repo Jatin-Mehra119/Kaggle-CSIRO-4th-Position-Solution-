@@ -27,7 +27,9 @@ def _sync_hf_weights():
             "jatinmehra/ONNX-CSIRO-Weights",
             files=[
                 ("aux_onnx/aux_model.onnx", AUX_ONNX_PATH),
+                ("aux_onnx/aux_model.onnx.data", AUX_ONNX_PATH + ".data"),
                 ("main_onnx/main_model.onnx", MAIN_ONNX_PATH),
+                ("main_onnx/main_model.onnx.data", MAIN_ONNX_PATH + ".data"),
                 ("scalers/aux_scaler.pth", AUX_SCALER_PATH),
                 ("scalers/target_scaler.pth", TARGET_SCALER_PATH),
             ],
