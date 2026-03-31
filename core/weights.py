@@ -13,29 +13,33 @@ from core.config import (
     TARGET_SCALER_PATH,
 )
 
-from huggingface_hub import download_bucket_files
-
 # ---------------------------------------------------------------------------
-# Checkpoint loading
+# Local weight loading
 # ---------------------------------------------------------------------------
 
-def _sync_hf_weights():
-    """Sync weights from the Hugging Face bucket."""
-    print("Syncing model weights from Hugging Face bucket...")
-    try:
-        download_bucket_files(
-            "jatinmehra/ONNX-CSIRO-Weights",
-            files=[
-                ("aux_onnx/aux_model.onnx", AUX_ONNX_PATH),
-                ("aux_onnx/aux_model.onnx.data", AUX_ONNX_PATH + ".data"),
-                ("main_onnx/main_model.onnx", MAIN_ONNX_PATH),
-                ("main_onnx/main_model.onnx.data", MAIN_ONNX_PATH + ".data"),
-                ("scalers/aux_scaler.pth", AUX_SCALER_PATH),
-                ("scalers/target_scaler.pth", TARGET_SCALER_PATH),
-            ],
+def _validate_required_files() -> None:
+    """Fail fast when required local/container weight files are missing."""
+    missing = [
+        path
+        for path in (AUX_ONNX_PATH, MAIN_ONNX_PATH)
+        if not os.path.isfile(path)
+    ]
+    if missing:
+        missing_str = ", ".join(missing)
+        
+        err_msg = (
+            f"Missing required model files: {missing_str}. "
+            "Ensure your files (aux_model.onnx, main_model.onnx) are inside /data "
+            "or set WEIGHTS_ROOT environment variable."
         )
-    except Exception as e:
-        print(f"Warning: Failed to sync weights from HF bucket: {e}")
+        
+        # Try to debug log what was actually found in /data
+        data_contents = []
+        if os.path.isdir("/data"):
+            data_contents = os.listdir("/data")
+            err_msg += f" Found in /data: {data_contents}"
+            
+        raise FileNotFoundError(err_msg)
 
 def _load_aux_model() -> tuple:
     """Return (ONNX InferenceSession, tab_scaler | None)."""
@@ -74,14 +78,12 @@ _models: dict = {}
 def get_models() -> dict:
     """
     Load and return models.
-
     Returns a dict with keys:
       - ``aux_folds``  : list[(InferenceSession, tab_scaler)]
       - ``main_folds`` : list[(InferenceSession, tabular_scaler, target_scaler)]
     """
     if not _models:
-        # Step 1: Ensure weights are available & synced
-        _sync_hf_weights()
+        _validate_required_files()
 
         print("Loading AUX ONNX model and scaler...")
         _models["aux_folds"] = [_load_aux_model()]

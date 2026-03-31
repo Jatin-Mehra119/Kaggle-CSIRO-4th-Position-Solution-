@@ -2,6 +2,7 @@
 Centralised configuration constants for the CSIRO Biomass Prediction pipeline.
 """
 
+import os
 import torch
 
 # Image size must match training
@@ -26,10 +27,39 @@ DEVICE: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cp
 DTYPE: torch.dtype = torch.float16 if DEVICE.type == "cuda" else torch.float32
 
 # ---------------------------------------------------------------------------
-# Local paths for ONNX models and scalers
+# Dynamic Paths for ONNX models and scalers
 # ---------------------------------------------------------------------------
 
-AUX_ONNX_PATH: str = "weights/aux_onnx/aux_model.onnx"
-MAIN_ONNX_PATH: str = "weights/main_onnx/main_model.onnx"
-AUX_SCALER_PATH: str = "weights/scalers/aux_scaler.pth"
-TARGET_SCALER_PATH: str = "weights/scalers/target_scaler.pth"
+def _find_file(filename: str, search_roots: list[str]) -> str:
+    """Find a file by searching recursively through the provided roots."""
+    for root in search_roots:
+        if not os.path.isdir(root):
+            continue
+        for curr_dir, _, files in os.walk(root):
+            # Limit depth search to prevent excessive scanning
+            rel = os.path.relpath(curr_dir, root)
+            depth = 0 if rel == "." else rel.count(os.sep) + 1
+            if depth > 4:
+                continue
+                
+            if filename in files:
+                return os.path.join(curr_dir, filename)
+                
+    # Fallback to an expected default path so errors show a sensible missing path
+    default_root = search_roots[0] if search_roots else "/data"
+    sub_dir = "scalers" if filename.endswith(".pth") else (
+        "aux_onnx" if "aux" in filename else "main_onnx"
+    )
+    return os.path.join(default_root, sub_dir, filename)
+
+_search_paths = []
+if "WEIGHTS_ROOT" in os.environ:
+    _search_paths.append(os.environ["WEIGHTS_ROOT"])
+_search_paths.extend(["/data", "weights", "."])
+
+AUX_ONNX_PATH: str = _find_file("aux_model.onnx", _search_paths)
+MAIN_ONNX_PATH: str = _find_file("main_model.onnx", _search_paths)
+AUX_SCALER_PATH: str = _find_file("aux_scaler.pth", _search_paths)
+TARGET_SCALER_PATH: str = _find_file("target_scaler.pth", _search_paths)
+
+WEIGHTS_ROOT: str = _search_paths[0] if _search_paths else "/data"
