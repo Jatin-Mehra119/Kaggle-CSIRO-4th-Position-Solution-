@@ -9,7 +9,7 @@
 
 [![Hugging Face — Main Model](https://img.shields.io/badge/%F0%9F%A4%97%20Main%20Model-CSIRO--DinoV3--HugePlus--LB76-FFD21E?style=flat-square)](https://huggingface.co/jatinmehra/CSIRO-DinoV3-HugePlus-LB76)
 [![Hugging Face — Aux Model](https://img.shields.io/badge/%F0%9F%A4%97%20Aux%20Model-CSIRO--AUX__MODEL-FFD21E?style=flat-square)](https://huggingface.co/jatinmehra/CSIRO-AUX_MODEL)
-[![Live API](https://img.shields.io/badge/🚀%20Live%20API-Prediction%20Endpoint-009688?style=flat-square)](https://jatinmehra-biomass-prediction.hf.space/docs)
+[![Live API](https://img.shields.io/badge/🚀%20Live%20API-Prediction%20Endpoint-009688?style=flat-square)](https://jatinmehra-biomass-prediction.hf.space)
 [![Frontend Demo](https://img.shields.io/badge/🌐%20Frontend-Live%20Demo-4285F4?style=flat-square&logo=github-pages&logoColor=white)](https://jatin-mehra119.github.io/Biomass-Prediction-Frontend)
 
 ---
