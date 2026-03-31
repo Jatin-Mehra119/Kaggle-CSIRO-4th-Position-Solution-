@@ -179,7 +179,7 @@ class HybridTexturePooling(nn.Module):
 
 ## 🚀 API Deployment
 
-The trained model is deployed as a **production-ready REST API** on Hugging Face Spaces, providing real-time biomass predictions.
+The trained model is deployed as a **production-ready REST API** on Hugging Face Spaces, providing real-time biomass predictions. To optimize API performance, the original PyTorch models (`.pth`) were converted to ONNX format, and the backend now utilizes `onnxruntime` for accelerated model inference.
 
 ### Live Endpoint
 
@@ -282,7 +282,7 @@ print(predictions)
 
 ### Model Artifacts
 
-Both model checkpoints are hosted on Hugging Face Hub and are automatically downloaded at API startup:
+Both model checkpoints are hosted in a Hugging Face Storage Bucket connected directly to the Docker container, allowing the FastAPI application to load weights directly from the storage bucket:
 
 | Model | Hub Repository | Size |
 |:------|:--------------|:-----|
